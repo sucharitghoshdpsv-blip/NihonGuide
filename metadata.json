@@ -1,0 +1,6 @@
+{
+  "name": "TabiGuide",
+  "description": "Japanese travel guide with interactive lessons, AI nuance translation, pronunciation practice, offline maps, personalized itinerary builder, budget tracker, encrypted document vault, emergency contacts, and traveler community.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

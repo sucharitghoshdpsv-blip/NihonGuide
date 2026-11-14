@@ -1,0 +1,286 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Global Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    // --- Entity Validation Helpers ---
+    function isValidUserProfile(data, userId) {
+      return data.userId == userId &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 60 &&
+             data.dailyBudgetJpy is int && data.dailyBudgetJpy >= 0 && data.dailyBudgetJpy <= 10000000 &&
+             data.mfaEnabled is bool &&
+             (!('homeCity' in data) || (data.homeCity is string && data.homeCity.size() <= 60)) &&
+             (!('interests' in data) || (data.interests is list && data.interests.size() <= 10 && (data.interests.size() == 0 || data.interests[0] is string))) &&
+             (!('visitedRegions' in data) || (data.visitedRegions is list && data.visitedRegions.size() <= 20 && (data.visitedRegions.size() == 0 || data.visitedRegions[0] is string))) &&
+             (!('totpSecretEncrypted' in data) || (data.totpSecretEncrypted is string && data.totpSecretEncrypted.size() <= 256)) &&
+             (!('emergencyMedicalSummaryJa' in data) || (data.emergencyMedicalSummaryJa is string && data.emergencyMedicalSummaryJa.size() <= 1000)) &&
+             (!('bloodType' in data) || (data.bloodType is string && data.bloodType.size() <= 20)) &&
+             (!('allergies' in data) || (data.allergies is string && data.allergies.size() <= 300));
+    }
+
+    function isValidItineraryItem(data, userId) {
+      return data.userId == userId &&
+             data.dayNumber is int && data.dayNumber >= 1 && data.dayNumber <= 30 &&
+             data.timeSlot is string && data.timeSlot.size() >= 1 && data.timeSlot.size() <= 30 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+             data.city is string && data.city.size() >= 1 && data.city.size() <= 60 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 40 &&
+             data.estimatedCostJpy is int && data.estimatedCostJpy >= 0 && data.estimatedCostJpy <= 10000000 &&
+             data.completed is bool &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 500));
+    }
+
+    function isValidBudgetExpense(data, userId) {
+      return data.userId == userId &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+             data.amountJpy is int && data.amountJpy >= 1 && data.amountJpy <= 100000000 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 40 &&
+             data.dayNumber is int && data.dayNumber >= 1 && data.dayNumber <= 30 &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 300));
+    }
+
+    function isValidEncryptedTravelDoc(data, userId) {
+      return data.userId == userId &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
+             data.docType is string && data.docType.size() >= 1 && data.docType.size() <= 40 &&
+             data.encryptedPayload is string && data.encryptedPayload.size() >= 1 && data.encryptedPayload.size() <= 20000 &&
+             data.ivBase64 is string && data.ivBase64.size() >= 1 && data.ivBase64.size() <= 100 &&
+             data.keyMode in ['KEYSTORE', 'PASSPHRASE'] &&
+             (!('saltBase64' in data) || (data.saltBase64 is string && data.saltBase64.size() <= 100));
+    }
+
+    function isValidLessonProgress(data, userId) {
+      return data.userId == userId &&
+             data.lessonId is string && data.lessonId.size() >= 1 && data.lessonId.size() <= 80 &&
+             data.completed is bool &&
+             data.score is int && data.score >= 0 && data.score <= 100 &&
+             data.masteredPhrases is int && data.masteredPhrases >= 0 && data.masteredPhrases <= 500;
+    }
+
+    function isValidFlightAlert(data, userId) {
+      return data.userId == userId &&
+             data.flightNumber is string && data.flightNumber.size() >= 1 && data.flightNumber.size() <= 20 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+             data.departureTimeText is string && data.departureTimeText.size() >= 1 && data.departureTimeText.size() <= 60 &&
+             data.triggerEpochMillis is int && data.triggerEpochMillis >= 0 &&
+             data.status is string && data.status.size() >= 1 && data.status.size() <= 40 &&
+             (!('gateOrTerminal' in data) || (data.gateOrTerminal is string && data.gateOrTerminal.size() <= 60));
+    }
+
+    function isValidTravelerPost(data) {
+      return data.authorId is string && data.authorId.size() >= 1 && data.authorId.size() <= 128 &&
+             data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 60 &&
+             data.city is string && data.city.size() >= 1 && data.city.size() <= 50 &&
+             data.topic is string && data.topic.size() >= 1 && data.topic.size() <= 40 &&
+             data.message is string && data.message.size() >= 1 && data.message.size() <= 500 &&
+             data.visibility == 'public' &&
+             data.interestedUids is list && data.interestedUids.size() <= 50 &&
+             (data.interestedUids.size() == 0 || data.interestedUids[0] is string) &&
+             (!('meetupTime' in data) || (data.meetupTime is string && data.meetupTime.size() <= 60));
+    }
+
+    // --- Collection Rules ---
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow list: if false;
+
+      allow create: if isValidId(userId) &&
+                       isOwner(userId) &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'dailyBudgetJpy', 'mfaEnabled', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'homeCity', 'interests', 'visitedRegions', 'dailyBudgetJpy', 'mfaEnabled', 'totpSecretEncrypted', 'emergencyMedicalSummaryJa', 'bloodType', 'allergies', 'createdAt', 'updatedAt']) &&
+                       isValidUserProfile(incoming(), userId) &&
+                       isValidTimestamp(incoming().createdAt) &&
+                       isValidTimestamp(incoming().updatedAt);
+
+      allow update: if isValidId(userId) &&
+                       isOwner(userId) &&
+                       isValidUserProfile(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'homeCity', 'interests', 'visitedRegions', 'dailyBudgetJpy', 'mfaEnabled', 'totpSecretEncrypted', 'emergencyMedicalSummaryJa', 'bloodType', 'allergies', 'updatedAt']);
+
+      allow delete: if isValidId(userId) && isOwner(userId);
+
+      match /itineraries/{itineraryId} {
+        allow get: if isValidId(itineraryId) && isOwner(userId);
+        allow list: if isOwner(userId);
+
+        allow create: if isValidId(itineraryId) &&
+                         isOwner(userId) &&
+                         incoming().keys().hasAll(['userId', 'dayNumber', 'timeSlot', 'title', 'city', 'category', 'estimatedCostJpy', 'completed', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'dayNumber', 'timeSlot', 'title', 'city', 'category', 'notes', 'estimatedCostJpy', 'completed', 'createdAt', 'updatedAt']) &&
+                         isValidItineraryItem(incoming(), userId) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt);
+
+        allow update: if isValidId(itineraryId) &&
+                         isOwner(userId) &&
+                         isValidItineraryItem(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['dayNumber', 'timeSlot', 'title', 'city', 'category', 'notes', 'estimatedCostJpy', 'completed', 'updatedAt']);
+
+        allow delete: if isValidId(itineraryId) && isOwner(userId);
+      }
+
+      match /expenses/{expenseId} {
+        allow get: if isValidId(expenseId) && isOwner(userId);
+        allow list: if isOwner(userId);
+
+        allow create: if isValidId(expenseId) &&
+                         isOwner(userId) &&
+                         incoming().keys().hasAll(['userId', 'title', 'amountJpy', 'category', 'dayNumber', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'title', 'amountJpy', 'category', 'dayNumber', 'notes', 'createdAt', 'updatedAt']) &&
+                         isValidBudgetExpense(incoming(), userId) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt);
+
+        allow update: if isValidId(expenseId) &&
+                         isOwner(userId) &&
+                         isValidBudgetExpense(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'amountJpy', 'category', 'dayNumber', 'notes', 'updatedAt']);
+
+        allow delete: if isValidId(expenseId) && isOwner(userId);
+      }
+
+      match /documents/{docId} {
+        allow get: if isValidId(docId) && isOwner(userId);
+        allow list: if isOwner(userId);
+
+        allow create: if isValidId(docId) &&
+                         isOwner(userId) &&
+                         incoming().keys().hasAll(['userId', 'title', 'docType', 'encryptedPayload', 'ivBase64', 'keyMode', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'title', 'docType', 'encryptedPayload', 'ivBase64', 'saltBase64', 'keyMode', 'createdAt', 'updatedAt']) &&
+                         isValidEncryptedTravelDoc(incoming(), userId) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt);
+
+        allow update: if isValidId(docId) &&
+                         isOwner(userId) &&
+                         isValidEncryptedTravelDoc(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'docType', 'encryptedPayload', 'ivBase64', 'saltBase64', 'keyMode', 'updatedAt']);
+
+        allow delete: if isValidId(docId) && isOwner(userId);
+      }
+
+      match /lesson_progress/{lessonId} {
+        allow get: if isValidId(lessonId) && isOwner(userId);
+        allow list: if isOwner(userId);
+
+        allow create: if isValidId(lessonId) &&
+                         isOwner(userId) &&
+                         incoming().keys().hasAll(['userId', 'lessonId', 'completed', 'score', 'masteredPhrases', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'lessonId', 'completed', 'score', 'masteredPhrases', 'createdAt', 'updatedAt']) &&
+                         isValidLessonProgress(incoming(), userId) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt);
+
+        allow update: if isValidId(lessonId) &&
+                         isOwner(userId) &&
+                         isValidLessonProgress(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().lessonId == existing().lessonId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['completed', 'score', 'masteredPhrases', 'updatedAt']);
+
+        allow delete: if isValidId(lessonId) && isOwner(userId);
+      }
+
+      match /alerts/{alertId} {
+        allow get: if isValidId(alertId) && isOwner(userId);
+        allow list: if isOwner(userId);
+
+        allow create: if isValidId(alertId) &&
+                         isOwner(userId) &&
+                         incoming().keys().hasAll(['userId', 'flightNumber', 'title', 'departureTimeText', 'triggerEpochMillis', 'status', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'flightNumber', 'title', 'departureTimeText', 'triggerEpochMillis', 'gateOrTerminal', 'status', 'createdAt', 'updatedAt']) &&
+                         isValidFlightAlert(incoming(), userId) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt);
+
+        allow update: if isValidId(alertId) &&
+                         isOwner(userId) &&
+                         isValidFlightAlert(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['flightNumber', 'title', 'departureTimeText', 'triggerEpochMillis', 'gateOrTerminal', 'status', 'updatedAt']);
+
+        allow delete: if isValidId(alertId) && isOwner(userId);
+      }
+    }
+
+    // Nearby Traveler Community Posts
+    match /traveler_posts/{postId} {
+      allow get: if isValidId(postId) && isSignedIn() &&
+                    (existing().visibility == 'public' || existing().authorId == request.auth.uid);
+
+      allow list: if isSignedIn() &&
+                     (resource.data.visibility == 'public' || resource.data.authorId == request.auth.uid);
+
+      allow create: if isValidId(postId) &&
+                       isSignedIn() &&
+                       incoming().authorId == request.auth.uid &&
+                       incoming().keys().hasAll(['authorId', 'authorName', 'city', 'topic', 'message', 'visibility', 'interestedUids', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['authorId', 'authorName', 'city', 'topic', 'message', 'meetupTime', 'visibility', 'interestedUids', 'createdAt', 'updatedAt']) &&
+                       isValidTravelerPost(incoming()) &&
+                       isValidTimestamp(incoming().createdAt) &&
+                       isValidTimestamp(incoming().updatedAt);
+
+      allow update: if isValidId(postId) &&
+                       isSignedIn() &&
+                       isValidTravelerPost(incoming()) &&
+                       incoming().authorId == existing().authorId &&
+                       incoming().visibility == existing().visibility &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       (
+                         // Action 1: Author edits post details
+                         (existing().authorId == request.auth.uid &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['city', 'topic', 'message', 'meetupTime', 'updatedAt'])) ||
+                         // Action 2: Authenticated traveler toggles RSVP/interested status
+                         (incoming().diff(existing()).affectedKeys().hasOnly(['interestedUids', 'updatedAt']))
+                       );
+
+      allow delete: if isValidId(postId) && isSignedIn() && existing().authorId == request.auth.uid;
+    }
+  }
+}

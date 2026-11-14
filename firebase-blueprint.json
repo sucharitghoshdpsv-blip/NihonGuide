@@ -1,0 +1,157 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated traveler profile, preferences, travel history, and security configuration.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the owner." },
+        "displayName": { "type": "string", "description": "Traveler display name." },
+        "homeCity": { "type": "string", "description": "Currently selected Japanese hub or home city." },
+        "interests": { "type": "array", "description": "Preferred travel interest tags." },
+        "visitedRegions": { "type": "array", "description": "Previous Japanese regions visited for AI recommendations." },
+        "dailyBudgetJpy": { "type": "integer", "description": "Daily travel budget target in JPY." },
+        "mfaEnabled": { "type": "boolean", "description": "Whether TOTP multi-factor vault security is enabled." },
+        "totpSecretEncrypted": { "type": "string", "description": "Client-encrypted TOTP secret." },
+        "emergencyMedicalSummaryJa": { "type": "string", "description": "Japanese emergency medical summary card." },
+        "bloodType": { "type": "string", "description": "Traveler blood type." },
+        "allergies": { "type": "string", "description": "Known allergies or medical notes." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["userId", "displayName", "dailyBudgetJpy", "mfaEnabled", "createdAt", "updatedAt"]
+    },
+    "ItineraryItem": {
+      "title": "ItineraryItem",
+      "description": "Personalized day-by-day itinerary activity.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner UID." },
+        "dayNumber": { "type": "integer", "description": "Trip day index (1-30)." },
+        "timeSlot": { "type": "string", "description": "Scheduled time slot." },
+        "title": { "type": "string", "description": "Activity title." },
+        "city": { "type": "string", "description": "Japanese city or district." },
+        "category": { "type": "string", "description": "Activity category." },
+        "notes": { "type": "string", "description": "Transit or cultural notes." },
+        "estimatedCostJpy": { "type": "integer", "description": "Estimated JPY cost." },
+        "completed": { "type": "boolean", "description": "Whether activity is completed." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["userId", "dayNumber", "timeSlot", "title", "city", "category", "estimatedCostJpy", "completed", "createdAt", "updatedAt"]
+    },
+    "BudgetExpense": {
+      "title": "BudgetExpense",
+      "description": "Travel expense entry tracked in JPY.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner UID." },
+        "title": { "type": "string", "description": "Expense description." },
+        "amountJpy": { "type": "integer", "description": "Expense amount in JPY." },
+        "category": { "type": "string", "description": "Expense category." },
+        "dayNumber": { "type": "integer", "description": "Trip day index." },
+        "notes": { "type": "string", "description": "Optional expense note." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["userId", "title", "amountJpy", "category", "dayNumber", "createdAt", "updatedAt"]
+    },
+    "EncryptedTravelDoc": {
+      "title": "EncryptedTravelDoc",
+      "description": "Client-side AES-256-GCM encrypted personal travel document.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner UID." },
+        "title": { "type": "string", "description": "Document label." },
+        "docType": { "type": "string", "description": "Document category." },
+        "encryptedPayload": { "type": "string", "description": "Base64 AES-256-GCM ciphertext." },
+        "ivBase64": { "type": "string", "description": "Base64 initialization vector." },
+        "saltBase64": { "type": "string", "description": "Base64 PBKDF2 salt if passphrase mode." },
+        "keyMode": { "type": "string", "description": "KEYSTORE or PASSPHRASE." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["userId", "title", "docType", "encryptedPayload", "ivBase64", "keyMode", "createdAt", "updatedAt"]
+    },
+    "LessonProgress": {
+      "title": "LessonProgress",
+      "description": "User Japanese language module completion and score.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner UID." },
+        "lessonId": { "type": "string", "description": "Lesson identifier." },
+        "completed": { "type": "boolean", "description": "Completion flag." },
+        "score": { "type": "integer", "description": "Exercise score 0-100." },
+        "masteredPhrases": { "type": "integer", "description": "Count of mastered phrases." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["userId", "lessonId", "completed", "score", "masteredPhrases", "createdAt", "updatedAt"]
+    },
+    "FlightAlert": {
+      "title": "FlightAlert",
+      "description": "Scheduled flight update and itinerary reminder.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner UID." },
+        "flightNumber": { "type": "string", "description": "Flight or Shinkansen code." },
+        "title": { "type": "string", "description": "Alert headline." },
+        "departureTimeText": { "type": "string", "description": "Human-readable departure time." },
+        "triggerEpochMillis": { "type": "integer", "description": "Scheduled reminder epoch ms." },
+        "gateOrTerminal": { "type": "string", "description": "Terminal, gate, or platform." },
+        "status": { "type": "string", "description": "Status label." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["userId", "flightNumber", "title", "departureTimeText", "triggerEpochMillis", "status", "createdAt", "updatedAt"]
+    },
+    "TravelerPost": {
+      "title": "TravelerPost",
+      "description": "Nearby traveler meetup and tip board post.",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string", "description": "Author Firebase Auth UID." },
+        "authorName": { "type": "string", "description": "Author display name." },
+        "city": { "type": "string", "description": "Japanese city/district tag." },
+        "topic": { "type": "string", "description": "Post topic." },
+        "message": { "type": "string", "description": "Post content." },
+        "meetupTime": { "type": "string", "description": "Optional meetup time." },
+        "visibility": { "type": "string", "description": "Must be public for community feed." },
+        "interestedUids": { "type": "array", "description": "Bounded list of interested traveler UIDs." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["authorId", "authorName", "city", "topic", "message", "visibility", "interestedUids", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private traveler profile and security settings."
+    },
+    "/users/{userId}/itineraries/{itineraryId}": {
+      "schema": { "$ref": "#/entities/ItineraryItem" },
+      "description": "User itinerary activities."
+    },
+    "/users/{userId}/expenses/{expenseId}": {
+      "schema": { "$ref": "#/entities/BudgetExpense" },
+      "description": "User daily budget expenses."
+    },
+    "/users/{userId}/documents/{docId}": {
+      "schema": { "$ref": "#/entities/EncryptedTravelDoc" },
+      "description": "End-to-end encrypted personal travel documents."
+    },
+    "/users/{userId}/lesson_progress/{lessonId}": {
+      "schema": { "$ref": "#/entities/LessonProgress" },
+      "description": "User Japanese language module progress."
+    },
+    "/users/{userId}/alerts/{alertId}": {
+      "schema": { "$ref": "#/entities/FlightAlert" },
+      "description": "User flight and itinerary reminder alerts."
+    },
+    "/traveler_posts/{postId}": {
+      "schema": { "$ref": "#/entities/TravelerPost" },
+      "description": "Authenticated traveler community posts and nearby meetups."
+    }
+  }
+}
